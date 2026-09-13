@@ -4,12 +4,9 @@ import com.ecommerce.ecom_proj.model.Product;
 import com.ecommerce.ecom_proj.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -38,11 +35,9 @@ public class ProductController {
     }
 
     @PostMapping("/product")
-    public ResponseEntity<?> addProduct(@RequestPart Product product,
-                                        @RequestPart MultipartFile imageFile){
+    public ResponseEntity<?> addProduct(@RequestBody Product product){
         try {
-            System.out.println(product);
-            Product product1 = service.addProduct(product, imageFile);
+            Product product1 = service.addProduct(product);
             return new ResponseEntity<>(product1, HttpStatus.CREATED);
         }
         catch(Exception e){
@@ -50,28 +45,9 @@ public class ProductController {
         }
     }
 
-    @GetMapping("/product/{productId}/image")
-    public ResponseEntity<byte[]> getImageByProductId(@PathVariable int productId){
-
-        Product product = service.getProductById(productId);
-        if(product == null || product.getImageDate() == null)
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.valueOf(product.getImageType()))
-                .body(product.getImageDate());
-
-    }
-
     @PutMapping("/product/{id}")
-    public ResponseEntity<String> updateProduct(@PathVariable int id, @RequestPart Product product,
-                                                @RequestPart MultipartFile imageFile){
-        Product product1 = null;
-        try {
-            product1 = service.updateProduct(id, product, imageFile);
-        } catch (IOException e) {
-            return new ResponseEntity<>("Failed to update", HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<String> updateProduct(@PathVariable int id, @RequestBody Product product){
+        Product product1 = service.updateProduct(id, product);
         if(product1 != null)
             return new ResponseEntity<>("Updated", HttpStatus.OK);
         else

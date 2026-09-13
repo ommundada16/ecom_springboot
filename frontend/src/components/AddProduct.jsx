@@ -12,33 +12,17 @@ const AddProduct = () => {
     releaseDate: "",
     productAvailable: false,
   });
-  const [image, setImage] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setProduct({ ...product, [name]: value });
   };
 
-  const handleImageChange = (e) => {
-    setImage(e.target.files[0]);
-    // setProduct({...product, image: e.target.files[0]})
-  };
-
   const submitHandler = (event) => {
     event.preventDefault();
-    const formData = new FormData();
-    formData.append("imageFile", image);
-    formData.append(
-      "product",
-      new Blob([JSON.stringify(product)], { type: "application/json" })
-    );
 
     axios
-      .post("http://localhost:8080/api/product", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
+      .post("http://localhost:8080/api/product", product)
       .then((response) => {
         console.log("Product added successfully:", response.data);
         alert("Product added successfully");
@@ -108,7 +92,7 @@ const AddProduct = () => {
             id="price"
           />
         </div>
-     
+
            <div className="col-md-6">
           <label className="form-label">
             <h6>Category</h6>
@@ -141,7 +125,6 @@ const AddProduct = () => {
             onChange={handleInputChange}
             value={product.stockQuantity}
             name="stockQuantity"
-            // value={`${stockAlert}/${stockQuantity}`}
             id="stockQuantity"
           />
         </div>
@@ -156,18 +139,6 @@ const AddProduct = () => {
             name="releaseDate"
             onChange={handleInputChange}
             id="releaseDate"
-          />
-        </div>
-        {/* <input className='image-control' type="file" name='file' onChange={(e) => setProduct({...product, image: e.target.files[0]})} />
-    <button className="btn btn-primary" >Add Photo</button>  */}
-        <div className="col-md-4">
-          <label className="form-label">
-            <h6>Image</h6>
-          </label>
-          <input
-            className="form-control"
-            type="file"
-            onChange={handleImageChange}
           />
         </div>
         <div className="col-12">
@@ -189,7 +160,6 @@ const AddProduct = () => {
           <button
             type="submit"
             className="btn btn-primary"
-            // onClick={submitHandler}
           >
             Submit
           </button>

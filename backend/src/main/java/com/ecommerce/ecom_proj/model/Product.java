@@ -1,6 +1,5 @@
 package com.ecommerce.ecom_proj.model;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -27,11 +26,5 @@ public class Product {
     private Date releaseDate;
     private boolean productAvailable;
     private int stockQuantity;
-
-    private String imageName;
-    private String imageType;
-    @Lob
-    private byte[] imageDate;
-
 
 }

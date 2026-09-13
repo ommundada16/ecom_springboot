@@ -3,13 +3,11 @@ import { useContext, useEffect } from "react";
 import { useState } from "react";
 import AppContext from "../Context/Context";
 import axios from "../axios";
-import UpdateProduct from "./UpdateProduct";
 const Product = () => {
   const { id } = useParams();
   const { data, addToCart, removeFromCart, cart, refreshData } =
     useContext(AppContext);
   const [product, setProduct] = useState(null);
-  const [imageUrl, setImageUrl] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,20 +17,9 @@ const Product = () => {
           `http://localhost:8080/api/product/${id}`
         );
         setProduct(response.data);
-        if (response.data.imageName) {
-          fetchImage();
-        }
       } catch (error) {
         console.error("Error fetching product:", error);
       }
-    };
-
-    const fetchImage = async () => {
-      const response = await axios.get(
-        `http://localhost:8080/api/product/${id}/image`,
-        { responseType: "blob" }
-      );
-      setImageUrl(URL.createObjectURL(response.data));
     };
 
     fetchProduct();
@@ -68,28 +55,21 @@ const Product = () => {
   }
   return (
     <>
-      <div className="containers" style={{ display: "flex" }}>
-        <img
-          className="left-column-img"
-          src={imageUrl}
-          alt={product.imageName}
-          style={{ width: "50%", height: "auto" }}
-        />
-
-        <div className="right-column" style={{ width: "50%" }}>
+      <div className="containers" style={{ display: "flex", padding: "2rem" }}>
+        <div className="right-column" style={{ width: "100%", maxWidth: "700px" }}>
           <div className="product-description">
             <div style={{display:'flex',justifyContent:'space-between' }}>
             <span style={{ fontSize: "1.2rem", fontWeight: 'lighter' }}>
               {product.category}
             </span>
             <p className="release-date" style={{ marginBottom: "2rem" }}>
-              
+
               <h6>Listed : <span> <i> {new Date(product.releaseDate).toLocaleDateString()}</i></span></h6>
               {/* <i> {new Date(product.releaseDate).toLocaleDateString()}</i> */}
             </p>
             </div>
-            
-           
+
+
             <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem",textTransform: 'capitalize', letterSpacing:'1px' }}>
               {product.name}
             </h1>
@@ -127,7 +107,7 @@ const Product = () => {
                 {product.stockQuantity}
               </i>
             </h6>
-          
+
           </div>
           <div className="update-button" style={{ display: "flex", gap: "1rem" }}>
             <button
@@ -146,7 +126,6 @@ const Product = () => {
             >
               Update
             </button>
-            {/* <UpdateProduct product={product} onUpdate={handleUpdate} /> */}
             <button
               className="btn btn-primary"
               type="button"
