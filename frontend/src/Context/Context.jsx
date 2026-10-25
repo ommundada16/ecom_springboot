@@ -1,74 +1,75 @@
-import axios from "../axios";
-import { useState, useEffect, createContext } from "react";
+import { useState, useEffect, useCallback, useMemo, createContext } from "react";
 
 const AppContext = createContext({
-  data: [],
-  isError: "",
   cart: [],
-  addToCart: (product) => {},
-  removeFromCart: (productId) => {},
-  refreshData:() =>{},
-  updateStockQuantity: (productId, newQuantity) =>{}
-  
+  addToCart: () => {},
+  removeFromCart: () => {},
+  updateQuantity: () => {},
+  replaceCart: () => {},
+  clearCart: () => {},
 });
 
-export const AppProvider = ({ children }) => {
-  const [data, setData] = useState([]);
-  const [isError, setIsError] = useState("");
-  const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart')) || []);
-
-
-  const addToCart = (product) => {
-    const existingProductIndex = cart.findIndex((item) => item.id === product.id);
-    if (existingProductIndex !== -1) {
-      const updatedCart = cart.map((item, index) =>
-        index === existingProductIndex
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      );
-      setCart(updatedCart);
-      localStorage.setItem('cart', JSON.stringify(updatedCart));
-    } else {
-      const updatedCart = [...cart, { ...product, quantity: 1 }];
-      setCart(updatedCart);
-      localStorage.setItem('cart', JSON.stringify(updatedCart));
-    }
-  };
-
-  const removeFromCart = (productId) => {
-    console.log("productID",productId)
-    const updatedCart = cart.filter((item) => item.id !== productId);
-    setCart(updatedCart);
-    localStorage.setItem('cart', JSON.stringify(updatedCart));
-    console.log("CART",cart)
-  };
-
-  const refreshData = async () => {
-    try {
-      const response = await axios.get("/products");
-      setData(response.data);
-    } catch (error) {
-      setIsError(error.message);
-    }
-  };
-
-  const clearCart =() =>{
-    setCart([]);
+const readStoredCart = () => {
+  try {
+    return JSON.parse(localStorage.getItem("cart")) || [];
+  } catch {
+    return [];
   }
-  
+};
+
+// The cart is only a local basket. Stock is checked and the order is stored by the backend at checkout.
+export const AppProvider = ({ children }) => {
+  const [cart, setCart] = useState(readStoredCart);
+
   useEffect(() => {
-    refreshData();
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+
+  // These only use functional state updates, so they can keep a stable identity across renders.
+  const addToCart = useCallback((product) => {
+    setCart((current) => {
+      const existing = current.find((item) => item.id === product.id);
+      if (existing) {
+        return current.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: Math.min(item.quantity + 1, product.stockQuantity) }
+            : item
+        );
+      }
+      return [
+        ...current,
+        {
+          id: product.id,
+          name: product.name,
+          brand: product.brand,
+          price: product.price,
+          stockQuantity: product.stockQuantity,
+          quantity: 1,
+        },
+      ];
+    });
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart));
-  }, [cart]);
-  
-  return (
-    <AppContext.Provider value={{ data, isError, cart, addToCart, removeFromCart,refreshData, clearCart  }}>
-      {children}
-    </AppContext.Provider>
+  const removeFromCart = useCallback((productId) => {
+    setCart((current) => current.filter((item) => String(item.id) !== String(productId)));
+  }, []);
+
+  const updateQuantity = useCallback((productId, quantity) => {
+    setCart((current) =>
+      current.map((item) => (item.id === productId ? { ...item, quantity } : item))
+    );
+  }, []);
+
+  const replaceCart = useCallback((items) => setCart(items), []);
+
+  const clearCart = useCallback(() => setCart([]), []);
+
+  const value = useMemo(
+    () => ({ cart, addToCart, removeFromCart, updateQuantity, replaceCart, clearCart }),
+    [cart, addToCart, removeFromCart, updateQuantity, replaceCart, clearCart]
   );
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
 export default AppContext;

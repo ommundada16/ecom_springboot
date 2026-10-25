@@ -1,115 +1,83 @@
-import React, { useEffect, useState } from "react";
-import Home from "./Home"
-import axios from "axios";
-// import { json } from "react-router-dom";
-// import { BiSunFill, BiMoon } from "react-icons/bi";
+import { useContext, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import API from "../axios";
+import AppContext from "../Context/Context";
+import { useAuth } from "../Context/AuthContext";
+import categories from "../categories";
 
-const Navbar = ({ onSelectCategory, onSearch }) => {
+const Navbar = ({ onSelectCategory }) => {
+  const navigate = useNavigate();
+  const { user, isAdmin, logout } = useAuth();
+  const { cart } = useContext(AppContext);
+
   const getInitialTheme = () => {
     const storedTheme = localStorage.getItem("theme");
     return storedTheme ? storedTheme : "light-theme";
   };
-  const [selectedCategory, setSelectedCategory] = useState("");
   const [theme, setTheme] = useState(getInitialTheme());
   const [input, setInput] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [noResults, setNoResults] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [showSearchResults,setShowSearchResults] = useState(false)
+  const [searching, setSearching] = useState(false);
+
+  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async (value) => {
-    try {
-      const response = await axios.get("http://localhost:8080/api/products");
-      setSearchResults(response.data);
-      console.log(response.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
-
-  const handleChange = async (value) => {
-    setInput(value);
-    if (value.length >= 1) {
-      setShowSearchResults(true)
-    try {
-      const response = await axios.get(
-        `http://localhost:8080/api/products/search?keyword=${value}`
-      );
-      setSearchResults(response.data);
-      setNoResults(response.data.length === 0);
-      console.log(response.data);
-    } catch (error) {
-      console.error("Error searching:", error);
-    }
-    } else {
-      setShowSearchResults(false);
+    const keyword = input.trim();
+    if (!keyword) {
       setSearchResults([]);
-      setNoResults(false);
+      setSearching(false);
+      return;
     }
-  };
-
-  
-  // const handleChange = async (value) => {
-  //   setInput(value);
-  //   if (value.length >= 1) {
-  //     setShowSearchResults(true);
-  //     try {
-  //       let response;
-  //       if (!isNaN(value)) {
-  //         // Input is a number, search by ID
-  //         response = await axios.get(`http://localhost:8080/api/products/search?id=${value}`);
-  //       } else {
-  //         // Input is not a number, search by keyword
-  //         response = await axios.get(`http://localhost:8080/api/products/search?keyword=${value}`);
-  //       }
-
-  //       const results = response.data;
-  //       setSearchResults(results);
-  //       setNoResults(results.length === 0);
-  //       console.log(results);
-  //     } catch (error) {
-  //       console.error("Error searching:", error.response ? error.response.data : error.message);
-  //     }
-  //   } else {
-  //     setShowSearchResults(false);
-  //     setSearchResults([]);
-  //     setNoResults(false);
-  //   }
-  // };
+    setSearching(true);
+    let cancelled = false;
+    // Wait for a short pause in typing instead of calling the API on every keystroke.
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await API.get("/products/search", { params: { keyword } });
+        if (!cancelled) setSearchResults(data);
+      } catch (error) {
+        console.error("Error searching:", error);
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [input]);
 
   const handleCategorySelect = (category) => {
-    setSelectedCategory(category);
     onSelectCategory(category);
+    navigate("/");
   };
+
   const toggleTheme = () => {
     const newTheme = theme === "dark-theme" ? "light-theme" : "dark-theme";
     setTheme(newTheme);
     localStorage.setItem("theme", newTheme);
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
   useEffect(() => {
     document.body.className = theme;
   }, [theme]);
 
-  const categories = [
-    "Laptop",
-    "Headphone",
-    "Mobile",
-    "Electronics",
-    "Toys",
-    "Fashion",
-  ];
+  const showSearchResults = input.trim().length > 0;
+
   return (
     <>
       <header>
         <nav className="navbar navbar-expand-lg fixed-top">
           <div className="container-fluid">
-            <a className="navbar-brand" href="/">
+            <Link className="navbar-brand" to="/" onClick={() => onSelectCategory("")}>
               ShopEase
-            </a>
+            </Link>
             <button
               className="navbar-toggler"
               type="button"
@@ -121,21 +89,27 @@ const Navbar = ({ onSelectCategory, onSearch }) => {
             >
               <span className="navbar-toggler-icon"></span>
             </button>
-            <div
-              className="collapse navbar-collapse"
-              id="navbarSupportedContent"
-            >
+            <div className="collapse navbar-collapse" id="navbarSupportedContent">
               <ul className="navbar-nav me-auto mb-2 mb-lg-0">
                 <li className="nav-item">
-                  <a className="nav-link active" aria-current="page" href="/">
+                  <Link className="nav-link active" aria-current="page" to="/" onClick={() => onSelectCategory("")}>
                     Home
-                  </a>
+                  </Link>
                 </li>
-                <li className="nav-item">
-                  <a className="nav-link" href="/add_product">
-                    Add Product
-                  </a>
-                </li>
+                {isAdmin && (
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/add_product">
+                      Add Product
+                    </Link>
+                  </li>
+                )}
+                {user && (
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/orders">
+                      My Orders
+                    </Link>
+                  </li>
+                )}
 
                 <li className="nav-item dropdown">
                   <a
@@ -144,11 +118,17 @@ const Navbar = ({ onSelectCategory, onSearch }) => {
                     role="button"
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
+                    onClick={(e) => e.preventDefault()}
                   >
                     Categories
                   </a>
 
                   <ul className="dropdown-menu">
+                    <li>
+                      <button className="dropdown-item" onClick={() => handleCategorySelect("")}>
+                        All products
+                      </button>
+                    </li>
                     {categories.map((category) => (
                       <li key={category}>
                         <button
@@ -161,8 +141,6 @@ const Navbar = ({ onSelectCategory, onSearch }) => {
                     ))}
                   </ul>
                 </li>
-
-                <li className="nav-item"></li>
               </ul>
               <button className="theme-btn" onClick={() => toggleTheme()}>
                 {theme === "dark-theme" ? (
@@ -172,52 +150,65 @@ const Navbar = ({ onSelectCategory, onSearch }) => {
                 )}
               </button>
               <div className="d-flex align-items-center cart">
-                <a href="/cart" className="nav-link text-dark">
+                <Link to="/cart" className="nav-link text-dark">
                   <i
                     className="bi bi-cart me-2"
                     style={{ display: "flex", alignItems: "center" }}
                   >
-                    Cart
+                    Cart{cartCount > 0 ? ` (${cartCount})` : ""}
                   </i>
-                </a>
-                {/* <form className="d-flex" role="search" onSubmit={handleSearch} id="searchForm"> */}
+                </Link>
                 <input
                   className="form-control me-2"
                   type="search"
                   placeholder="Search"
                   aria-label="Search"
                   value={input}
-                  onChange={(e) => handleChange(e.target.value)}
-                  onFocus={() => setSearchFocused(true)} // Set searchFocused to true when search bar is focused
-                  onBlur={() => setSearchFocused(false)} // Set searchFocused to false when search bar loses focus
+                  onChange={(e) => setInput(e.target.value)}
                 />
                 {showSearchResults && (
                   <ul className="list-group">
-                    {searchResults.length > 0 ? (  
-                        searchResults.map((result) => (
-                          <li key={result.id} className="list-group-item">
-                            <a href={`/product/${result.id}`} className="search-result-link">
+                    {searchResults.length > 0 ? (
+                      searchResults.map((result) => (
+                        <li key={result.id} className="list-group-item">
+                          <Link
+                            to={`/product/${result.id}`}
+                            className="search-result-link"
+                            onClick={() => setInput("")}
+                          >
                             <span>{result.name}</span>
-                            </a>
-                          </li>
-                        ))
+                          </Link>
+                        </li>
+                      ))
                     ) : (
-                      noResults && (
-                        <p className="no-results-message">
-                          No Prouduct with such Name
-                        </p>
+                      !searching && (
+                        <p className="no-results-message">No products match your search</p>
                       )
                     )}
                   </ul>
                 )}
-                {/* <button
-                  className="btn btn-outline-success"
-                  onClick={handleSearch}
-                >
-                  Search Products
-                </button> */}
-                {/* </form> */}
-                <div />
+              </div>
+              <div className="d-flex align-items-center ms-3 gap-2 auth-links">
+                {user ? (
+                  <>
+                    <span className="navbar-user">
+                      Hi, {user.name.split(" ")[0]}
+                      {isAdmin && <span className="badge bg-warning text-dark ms-1">Admin</span>}
+                    </span>
+                    <button className="btn btn-outline-secondary btn-sm" onClick={handleLogout}>
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link className="btn btn-outline-secondary btn-sm" to="/login">
+                      Log in
+                    </Link>
+                    <Link className="btn btn-primary btn-sm" to="/register">
+                      Sign up
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>

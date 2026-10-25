@@ -1179,3 +1179,46 @@ font-size: 14px;
   height: 1px;
   background: var(--hr_line_card)
 }
+
+/* <......................................PAGES: AUTH, ORDERS, PRODUCT.......................................> */
+
+.page-container {
+  max-width: 900px;
+  margin: 90px auto 40px;
+  padding: 0 16px;
+  color: var(--para-clr);
+}
+
+.page-container.narrow {
+  max-width: 460px;
+}
+
+.panel {
+  background: var(--cart_body_color);
+  color: var(--para-clr);
+  border-radius: 6px;
+  box-shadow: 1px 2px 3px 2px rgba(0, 0, 0, 0.2);
+  padding: 28px;
+}
+
+.page-container h2,
+.page-container h1 {
+  color: var(--para-clr);
+  background: transparent;
+}
+
+.products-heading {
+  color: var(--para-clr);
+}
+
+.order-table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--para-clr);
+  --bs-table-border-color: rgba(128, 128, 128, 0.35);
+  color: var(--para-clr);
+}
+
+.navbar-user {
+  color: var(--navbar_text);
+  white-space: nowrap;
+}

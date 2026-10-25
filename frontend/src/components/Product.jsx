@@ -1,151 +1,127 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useContext, useEffect } from "react";
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import AppContext from "../Context/Context";
-import axios from "../axios";
+import { useAuth } from "../Context/AuthContext";
+import API, { errorMessage } from "../axios";
+import { formatDate, formatPrice } from "../utils/format";
+
 const Product = () => {
   const { id } = useParams();
-  const { data, addToCart, removeFromCart, cart, refreshData } =
-    useContext(AppContext);
+  const { addToCart, removeFromCart } = useContext(AppContext);
+  const { isAdmin } = useAuth();
   const [product, setProduct] = useState(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        const response = await axios.get(
-          `http://localhost:8080/api/product/${id}`
-        );
-        setProduct(response.data);
-      } catch (error) {
-        console.error("Error fetching product:", error);
-      }
+    let cancelled = false;
+    setProduct(null);
+    setError("");
+    setNotice("");
+    API.get(`/products/${id}`)
+      .then(({ data }) => {
+        if (!cancelled) setProduct(data);
+      })
+      .catch((err) => {
+        console.error("Error fetching product:", err);
+        if (!cancelled) {
+          setError(err.response?.status === 404 ? "This product does not exist." : errorMessage(err));
+        }
+      });
+    return () => {
+      cancelled = true;
     };
-
-    fetchProduct();
   }, [id]);
 
   const deleteProduct = async () => {
+    if (!window.confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
     try {
-      await axios.delete(`http://localhost:8080/api/product/${id}`);
+      await API.delete(`/products/${id}`);
       removeFromCart(id);
-      console.log("Product deleted successfully");
-      alert("Product deleted successfully");
-      refreshData();
       navigate("/");
-    } catch (error) {
-      console.error("Error deleting product:", error);
+    } catch (err) {
+      console.error("Error deleting product:", err);
+      setError(errorMessage(err));
     }
   };
 
-  const handleEditClick = () => {
-    navigate(`/product/update/${id}`);
+  const handleAddToCart = () => {
+    addToCart(product);
+    setNotice("Added to your cart.");
   };
 
-  const handlAddToCart = () => {
-    addToCart(product);
-    alert("Product added to cart");
-  };
+  if (error) {
+    return (
+      <div className="page-container narrow">
+        <div className="alert alert-danger">{error}</div>
+      </div>
+    );
+  }
   if (!product) {
     return (
-      <h2 className="text-center" style={{ padding: "10rem" }}>
+      <h2 className="text-center products-heading" style={{ padding: "10rem" }}>
         Loading...
       </h2>
     );
   }
+
+  const inStock = product.productAvailable && product.stockQuantity > 0;
+
   return (
-    <>
-      <div className="containers" style={{ display: "flex", padding: "2rem" }}>
-        <div className="right-column" style={{ width: "100%", maxWidth: "700px" }}>
-          <div className="product-description">
-            <div style={{display:'flex',justifyContent:'space-between' }}>
-            <span style={{ fontSize: "1.2rem", fontWeight: 'lighter' }}>
-              {product.category}
-            </span>
-            <p className="release-date" style={{ marginBottom: "2rem" }}>
+    <div className="page-container">
+      <div className="panel">
+        <div className="d-flex justify-content-between">
+          <span style={{ fontSize: "1.2rem", fontWeight: "lighter" }}>{product.category}</span>
+          <span>
+            Listed: <i>{formatDate(product.releaseDate)}</i>
+          </span>
+        </div>
 
-              <h6>Listed : <span> <i> {new Date(product.releaseDate).toLocaleDateString()}</i></span></h6>
-              {/* <i> {new Date(product.releaseDate).toLocaleDateString()}</i> */}
-            </p>
-            </div>
+        <h1
+          style={{ fontSize: "2rem", margin: "1rem 0 0.5rem", textTransform: "capitalize", letterSpacing: "1px" }}
+        >
+          {product.name}
+        </h1>
+        <i>{product.brand}</i>
+        <p style={{ fontWeight: "bold", fontSize: "1rem", margin: "1.5rem 0 0" }}>PRODUCT DESCRIPTION:</p>
+        <p style={{ marginBottom: "1.5rem" }}>{product.description}</p>
 
+        <div className="d-flex align-items-center flex-wrap gap-3 mb-2">
+          <span style={{ fontSize: "2rem", fontWeight: "bold" }}>{formatPrice(product.price)}</span>
+          <button
+            className="btn btn-primary"
+            onClick={handleAddToCart}
+            disabled={!inStock}
+            style={{ padding: "0.8rem 2rem" }}
+          >
+            {inStock ? "Add to cart" : "Out of Stock"}
+          </button>
+        </div>
+        {notice && <div className="text-success mb-2">{notice}</div>}
+        <h6 className="mb-3">
+          Stock available:{" "}
+          <i style={{ color: inStock ? "green" : "crimson", fontWeight: "bold" }}>
+            {product.stockQuantity}
+          </i>
+        </h6>
 
-            <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem",textTransform: 'capitalize', letterSpacing:'1px' }}>
-              {product.name}
-            </h1>
-            <i style={{ marginBottom: "3rem" }}>{product.brand}</i>
-            <p style={{fontWeight:'bold',fontSize:'1rem',margin:'10px 0px 0px'}}>PRODUCT DESCRIPTION :</p>
-            <p style={{ marginBottom: "1rem" }}>{product.description}</p>
-          </div>
-
-          <div className="product-price">
-            <span style={{ fontSize: "2rem", fontWeight: "bold" }}>
-              {"$" + product.price}
-            </span>
-            <button
-              className={`cart-btn ${
-                !product.productAvailable ? "disabled-btn" : ""
-              }`}
-              onClick={handlAddToCart}
-              disabled={!product.productAvailable}
-              style={{
-                padding: "1rem 2rem",
-                fontSize: "1rem",
-                backgroundColor: "#007bff",
-                color: "white",
-                border: "none",
-                borderRadius: "5px",
-                cursor: "pointer",
-                marginBottom: "1rem",
-              }}
-            >
-              {product.productAvailable ? "Add to cart" : "Out of Stock"}
-            </button>
-            <h6 style={{ marginBottom: "1rem" }}>
-              Stock Available :{" "}
-              <i style={{ color: "green", fontWeight: "bold" }}>
-                {product.stockQuantity}
-              </i>
-            </h6>
-
-          </div>
-          <div className="update-button" style={{ display: "flex", gap: "1rem" }}>
+        {isAdmin && (
+          <div className="d-flex gap-3 mt-3">
             <button
               className="btn btn-primary"
               type="button"
-              onClick={handleEditClick}
-              style={{
-                padding: "1rem 2rem",
-                fontSize: "1rem",
-                backgroundColor: "#007bff",
-                color: "white",
-                border: "none",
-                borderRadius: "5px",
-                cursor: "pointer",
-              }}
+              onClick={() => navigate(`/product/update/${id}`)}
             >
               Update
             </button>
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={deleteProduct}
-              style={{
-                padding: "1rem 2rem",
-                fontSize: "1rem",
-                backgroundColor: "#dc3545",
-                color: "white",
-                border: "none",
-                borderRadius: "5px",
-                cursor: "pointer",
-              }}
-            >
+            <button className="btn btn-danger" type="button" onClick={deleteProduct}>
               Delete
             </button>
           </div>
-        </div>
+        )}
       </div>
-    </>
+    </div>
   );
 };
 

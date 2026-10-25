@@ -11,7 +11,15 @@ module.exports = {
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
   settings: { react: { version: '18.2' } },
   plugins: ['react-refresh'],
+  overrides: [
+    {
+      // Context modules legitimately export a provider component together with its hook.
+      files: ['src/Context/*.jsx'],
+      rules: { 'react-refresh/only-export-components': 'off' },
+    },
+  ],
   rules: {
+    'react/prop-types': 'off',
     'react/jsx-no-target-blank': 'off',
     'react-refresh/only-export-components': [
       'warn',

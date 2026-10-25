@@ -1,93 +1,112 @@
-import React, { useContext, useState, useEffect } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppContext from "../Context/Context";
-import axios from "axios";
+import { useAuth } from "../Context/AuthContext";
+import API, { errorMessage } from "../axios";
 import CheckoutPopup from "./CheckoutPopup";
-import { Button } from 'react-bootstrap';
+import { Button } from "react-bootstrap";
+import { formatPrice } from "../utils/format";
 
 const Cart = () => {
-  const { cart, removeFromCart , clearCart } = useContext(AppContext);
-  const [cartItems, setCartItems] = useState([]);
-  const [totalPrice, setTotalPrice] = useState(0);
+  const { cart, removeFromCart, updateQuantity, replaceCart, clearCart } = useContext(AppContext);
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [notice, setNotice] = useState("");
 
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+
+  // A sync that finishes after the page was left or the order was placed must not touch the cart.
+  const active = useRef(true);
   useEffect(() => {
-    const syncCartWithBackend = async () => {
-      try {
-        const response = await axios.get("http://localhost:8080/api/products");
-        const backendProductIds = response.data.map((product) => product.id);
-        const updatedCartItems = cart.filter((item) => backendProductIds.includes(item.id));
-        setCartItems(updatedCartItems);
-      } catch (error) {
-        console.error("Error fetching product data:", error);
-      }
+    active.current = true;
+    return () => {
+      active.current = false;
     };
+  }, []);
 
-    if (cart.length) {
-      syncCartWithBackend();
-    } else {
-      setCartItems([]);
+  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  // Refresh price and stock from the backend and drop items that are no longer for sale.
+  const syncWithBackend = useCallback(async () => {
+    const items = cartRef.current;
+    if (items.length === 0) return;
+    const results = await Promise.allSettled(items.map((item) => API.get(`/products/${item.id}`)));
+    if (!active.current) return;
+    const kept = [];
+    const removed = [];
+    results.forEach((result, index) => {
+      const item = items[index];
+      if (result.status === "fulfilled") {
+        const product = result.value.data;
+        if (product.productAvailable && product.stockQuantity > 0) {
+          kept.push({
+            ...item,
+            name: product.name,
+            brand: product.brand,
+            price: product.price,
+            stockQuantity: product.stockQuantity,
+            quantity: Math.min(item.quantity, product.stockQuantity),
+          });
+        } else {
+          removed.push(item.name);
+        }
+      } else if (result.reason.response?.status === 404) {
+        removed.push(item.name);
+      } else {
+        kept.push(item);
+      }
+    });
+    replaceCart(kept);
+    if (removed.length > 0) {
+      setNotice(`Removed because they are no longer available: ${removed.join(", ")}.`);
     }
-  }, [cart]);
+  }, [replaceCart]);
 
   useEffect(() => {
-    const total = cartItems.reduce(
-      (acc, item) => acc + item.price * item.quantity,
-      0
-    );
-    setTotalPrice(total);
-  }, [cartItems]);
+    syncWithBackend();
+  }, [syncWithBackend]);
 
-  const handleIncreaseQuantity = (itemId) => {
-    const newCartItems = cartItems.map((item) => {
-      if (item.id === itemId) {
-        if (item.quantity < item.stockQuantity) {
-          return { ...item, quantity: item.quantity + 1 };
-        } else {
-          alert("Cannot add more than available stock");
-        }
-      }
-      return item;
-    });
-    setCartItems(newCartItems);
+  const handleIncrease = (item) => {
+    if (item.quantity >= item.stockQuantity) {
+      setNotice(`Only ${item.stockQuantity} unit(s) of ${item.name} in stock.`);
+      return;
+    }
+    updateQuantity(item.id, item.quantity + 1);
   };
 
-
-  const handleDecreaseQuantity = (itemId) => {
-    const newCartItems = cartItems.map((item) =>
-      item.id === itemId
-        ? { ...item, quantity: Math.max(item.quantity - 1, 1) }
-        : item
-    );
-    setCartItems(newCartItems);
+  const handleDecrease = (item) => {
+    updateQuantity(item.id, Math.max(item.quantity - 1, 1));
   };
 
-  const handleRemoveFromCart = (itemId) => {
-    removeFromCart(itemId);
-    const newCartItems = cartItems.filter((item) => item.id !== itemId);
-    setCartItems(newCartItems);
+  const handleCheckoutClick = () => {
+    if (!user) {
+      navigate("/login", { state: { from: "/cart" } });
+      return;
+    }
+    setCheckoutError("");
+    setShowModal(true);
   };
 
   const handleCheckout = async () => {
+    setSubmitting(true);
+    setCheckoutError("");
     try {
-      for (const item of cartItems) {
-        const { quantity, ...rest } = item;
-        const updatedStockQuantity = item.stockQuantity - item.quantity;
-        const updatedProductData = { ...rest, stockQuantity: updatedStockQuantity };
-
-        await axios
-          .put(`http://localhost:8080/api/product/${item.id}`, updatedProductData)
-          .then((response) => {
-            console.log("Product updated successfully:", updatedProductData);
-          })
-          .catch((error) => {
-            console.error("Error updating product:", error);
-          });
-      }
+      await API.post("/orders", {
+        items: cart.map((item) => ({ productId: item.id, quantity: item.quantity })),
+      });
+      active.current = false;
       clearCart();
-      setCartItems([]);
       setShowModal(false);
-    } catch (error) {
-      console.log("error during checkout", error);
+      navigate("/orders", { state: { placed: true } });
+    } catch (err) {
+      setCheckoutError(errorMessage(err));
+      syncWithBackend();
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -95,19 +114,20 @@ const Cart = () => {
     <div className="cart-container">
       <div className="shopping-cart">
         <div className="title">Shopping Bag</div>
-        {cartItems.length === 0 ? (
+        {notice && (
+          <div className="alert alert-warning mt-3" role="alert">
+            {notice}
+          </div>
+        )}
+        {cart.length === 0 ? (
           <div className="empty" style={{ textAlign: "left", padding: "2rem" }}>
             <h4>Your cart is empty</h4>
           </div>
         ) : (
           <>
-            {cartItems.map((item) => (
+            {cart.map((item) => (
               <li key={item.id} className="cart-item">
-                <div
-                  className="item"
-                  style={{ display: "flex", alignContent: "center" }}
-                  key={item.id}
-                >
+                <div className="item" style={{ display: "flex", alignContent: "center" }}>
                   <div className="description">
                     <span>{item.brand}</span>
                     <span>{item.name}</span>
@@ -118,45 +138,37 @@ const Cart = () => {
                       className="plus-btn"
                       type="button"
                       name="button"
-                      onClick={() => handleIncreaseQuantity(item.id)}
+                      onClick={() => handleIncrease(item)}
                     >
                       <i className="bi bi-plus-square-fill"></i>
                     </button>
-                    <input
-                      type="button"
-                      name="name"
-                      value={item.quantity}
-                      readOnly
-                    />
+                    <input type="button" name="name" value={item.quantity} readOnly />
                     <button
                       className="minus-btn"
                       type="button"
                       name="button"
-                      onClick={() => handleDecreaseQuantity(item.id)}
+                      onClick={() => handleDecrease(item)}
                     >
                       <i className="bi bi-dash-square-fill"></i>
                     </button>
                   </div>
 
                   <div className="total-price " style={{ textAlign: "center" }}>
-                    ${item.price * item.quantity}
+                    {formatPrice(item.price * item.quantity)}
                   </div>
-                  <button
-                    className="remove-btn"
-                    onClick={() => handleRemoveFromCart(item.id)}
-                  >
+                  <button className="remove-btn" onClick={() => removeFromCart(item.id)}>
                     <i className="bi bi-trash3-fill"></i>
                   </button>
                 </div>
               </li>
             ))}
-            <div className="total">Total: ${totalPrice}</div>
+            <div className="total">Total: {formatPrice(totalPrice)}</div>
             <Button
               className="btn btn-primary"
               style={{ width: "100%" }}
-              onClick={() => setShowModal(true)}
+              onClick={handleCheckoutClick}
             >
-              Checkout
+              {user ? "Checkout" : "Log in to checkout"}
             </Button>
           </>
         )}
@@ -164,12 +176,13 @@ const Cart = () => {
       <CheckoutPopup
         show={showModal}
         handleClose={() => setShowModal(false)}
-        cartItems={cartItems}
+        cartItems={cart}
         totalPrice={totalPrice}
         handleCheckout={handleCheckout}
+        submitting={submitting}
+        error={checkoutError}
       />
     </div>
-
   );
 };
 
