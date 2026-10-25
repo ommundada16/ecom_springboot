@@ -1,6 +1,6 @@
 # ShopEase — Frontend
 
-React + Vite client for the ShopEase product catalog. See the [repo root README](../README.md) for the full project overview and API reference.
+React + Vite client for ShopEase. See the [repo root README](../README.md) for the full project overview, Docker setup and API reference.
 
 ## Development
 
@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Requires the [backend](../backend) to be running on `http://localhost:8080`.
+Requires the [backend](../backend) to be running. The API address comes from `VITE_API_URL` and defaults to `http://localhost:8080/api`; override it in a `.env.local` file.
 
 ## Scripts
 
