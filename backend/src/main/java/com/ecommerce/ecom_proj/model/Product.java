@@ -2,29 +2,47 @@ package com.ecommerce.ecom_proj.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDate;
 
 @Entity
-@Data
-@AllArgsConstructor
+@Table(name = "products")
+@Getter
+@Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Long id;
+
+    @Column(nullable = false, length = 150)
     private String name;
+
+    @Column(length = 1000)
     private String description;
+
+    @Column(length = 100)
     private String brand;
+
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
+
+    @Column(length = 50)
     private String category;
 
-    private Date releaseDate;
-    private boolean productAvailable;
-    private int stockQuantity;
+    private LocalDate releaseDate;
 
+    @Column(nullable = false)
+    private boolean productAvailable;
+
+    @Column(nullable = false)
+    private int stockQuantity;
 }
